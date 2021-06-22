@@ -1,4 +1,5 @@
 # %%
+import sys
 sys.path.append("/Users/kalmanszenes/code/mtd_torchani/torchmd")
 
 import torch
@@ -17,7 +18,7 @@ from ase.io import read
 
 # np.random.seed(0)
 # torch.manual_seed(0)
-
+structure = sys.argv[1]
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 precision = torch.float
@@ -25,7 +26,7 @@ precision = torch.float
 model = torchani.models.ANI1ccx(periodic_table_index=True).to(device) # ASE
 # model = torchani.models.ANI2x(periodic_table_index=True).to(device) # non-ASE
 
-alanine_ase = ase.Atoms(read('alanine_dipeptide.xyz'))
+alanine_ase = ase.Atoms(read(structure))
 alanine_ase.set_calculator(model.ase())
 # aspirin_ase.set_velocities(maxwell_boltzmann(system_ani.masses, T=300, replicas=1))
 alanine_ase.get_kinetic_energy()
@@ -46,6 +47,31 @@ psi = [7, 6, 8, 10] # Nitrogen
 phi = [15, 14, 8, 10] # Oxygen
 
 print(system_ani.get_dihedrals())
+print(system_ani.get_dihedrals_ani())
+
+# # %%
+# # --------- Dihedrals testing ----------
+# dihedrals = torch.tensor([1, 2])
+# offset = torch.tensor([[1, -1], [-1, 3]])
+# torch.exp(dihedrals + offset)
+
+# # %%
+# height = 0.004336
+# width = 0.05
+
+# dihedrals = system_ani.get_dihedrals_ani()
+# offset = torch.tensor([[1, 2]])
+# offset_2 = torch.tensor([[2, 1]])
+# peaks = torch.stack((dihedrals.detach() + offset, dihedrals.detach() + offset_2), axis=1)
+# # peaks = dihedrals.detach() + offset
+
+# bias = system_ani.get_bias(dihedrals, peaks, height=height, width=width)
+# bias
+# # bias = system_ani.get_bias(dihedrals, dihedrals.detach() + offset, height=0.004336, width=0.05) + system_ani.get_bias(dihedrals, dihedrals.detach() - 2 * offset, height=0.004336, width=0.05)
+
+# # %%
+# f_bias = -torch.autograd.grad(bias.sum(), system_ani.pos)[0]
+# f_bias
 
 # %%
 from minimizers import minimize_pytorch_bfgs_ANI
@@ -64,18 +90,25 @@ timestep = 1  # fs
 integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_gamma, temp=langevin_temperature)
 
 # %%
-n_iter = int(1000)
-print_iter = 10
+n_iter = int(1e4)
+print_iter = 1
 
 # cProfile.run('integrator_ani.run(n_iter, device=device)')
 
-integrator_ani.run(n_iter, traj_file='alanine_ani.xyz', traj_interval=print_iter,
-                    log_file='alanine_ani.csv', log_interval=print_iter, device=device)
+integrator_ani.run(n_iter, log_file='log/alanine_ani_B.csv', log_interval=print_iter, device=device)
 
 # %%
-nv.show_asetraj(read('alanine_ani.xyz', index=':'), gui=True)
+# import nglview as nv
+# from ase.io import read
+# nv.show_asetraj(read('alanine_ani.xyz', index=':'), gui=True)
 # %%
-import pandas as pd
-df = pd.read_csv('alanine_ani.csv', skiprows=1)
-df
+# import pandas as pd
+# df = pd.read_csv('alanine_ani.csv', skiprows=1)
+# df
+# # %%
+# import matplotlib.pyplot as plt
+# plt.scatter(df['Phi'], df['Psi'], marker='.')
+# plt.xlabel('Phi degrees')
+# plt.ylabel('Psi degrees')
+# %%
 # %%

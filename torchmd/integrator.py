@@ -162,12 +162,15 @@ class Langevin_integrator:
         self.c5 = dt**1.5 * sigma / (2 * np.sqrt(3))
         self.c4 = fr / 2. * self.c5
 
-    def step(self, forces=None, device='cuda'):
+    def step(self, forces=None, metadyn=None, device='cuda'):
         system = self.system
         n_system = len(system)
 
         if forces is None:
             forces = system.get_forces()
+
+        if metadyn is not None:
+            forces += self.get_bias_forces()
 
         self.vel = system.get_velocities()
 
@@ -190,7 +193,7 @@ class Langevin_integrator:
 
         # return system.get_kinetic_energy(), system.get_potential_energy(), system.get_temperature()
 
-    def run(self, n_iter=1, traj_file=None, traj_interval=1, log_file=None, log_interval=1, per_atom=True, device='cuda'):
+    def run(self, n_iter=1, traj_file=None, traj_interval=1, log_file=None, log_interval=1, per_atom=True, metadyn=None, metadyn_func=None, device='cuda'):
         # start_time = time.time()
         if traj_file is not None:
             traj_f = open(traj_file, 'w')
@@ -199,8 +202,11 @@ class Langevin_integrator:
             log_f = open(log_file, 'w')
             if per_atom:
                 log_f.write('# per atom \n')
-            # log_f.write('Epot,' + 'Ekin,' + 'Etot,' + 'Phi,Psi' + 'Temp\n') # Ramachandran
-            log_f.write('Epot,' + 'Ekin,' + 'Etot,' + 'Temp\n')
+            log_f.write('Epot,' + 'Ekin,' + 'Etot,' + 'Phi,Psi,' + 'Temp\n') # Ramachandran
+            # log_f.write('Epot,' + 'Ekin,' + 'Etot,' + 'Temp\n')
+
+        if metadyn is not None:
+            self.history = metadyn_func
 
         for i in tqdm(range(n_iter)):
             if traj_file is not None and i % traj_interval == 0:
@@ -212,7 +218,7 @@ class Langevin_integrator:
                 else:
                     self.write_log(log_f, per_atom)
 
-            self.step(device=device)
+            self.step(metadyn=metadyn, device=device)
 
         if traj_file is not None:
             traj_f.close()
@@ -223,10 +229,20 @@ class Langevin_integrator:
         # run_time = time.time() - start_time
         # print(f"----------- Simulation took {(run_time):.2f} sec ({(n_iter/run_time):.2f} iters/sec) -----------")
 
+    def get_bias(self, cv, peak, width=0.05, height=0.004336):
+        ''' 
+        https://www.sciencedirect.com/topics/biochemistry-genetics-and-molecular-biology/metadynamics
+        height = 0.1 kcal/mol = 0.004336 eV
+        width = 0.05
+        deposition rate = 2ps
+        sampling time = 500ns
+        '''
+        return height * torch.exp(- (cv - peak)**2 / (2 * width**2))
+
     def write_traj(self, traj_file):
         atom_types = self.system.get_symbols()
         # TODO check why pos needs detach() !
-        coord = self.system.get_positions().detach().reshape(-1, 3)
+        coord = self.system.get_positions().detach().view(-1, 3)
         traj_file.write(str(coord.shape[0]) + '\n\n')
         for j in range(coord.shape[0]):
             traj_file.write(atom_types[j])
@@ -243,10 +259,11 @@ class Langevin_integrator:
         ekin = self.system.get_kinetic_energy() / n
         etot = self.system.get_total_energy() / n
         temp = self.system.get_temperature()
-        log_file.write(str(epot) +  ',' + str(ekin) + ',' + str(etot) + ',' + str(temp) + '\n')
+        # log_file.write(str(epot) +  ',' + str(ekin) + ',' + str(etot) + ',' + str(temp) + '\n')
 
-        # phi, psi = self.system.get_dihedrals()
-        # log_file.write(str(epot) +  ',' + str(ekin) + ',' + str(etot) + ',' + str(phi) + ',' + str(psi) + ',' + str(temp) + '\n')
+
+        psi, phi = self.system.get_dihedrals_ani()[0]
+        log_file.write(str(epot) +  ',' + str(ekin) + ',' + str(etot) + ',' + str(phi.item()) + ',' + str(psi.item()) + ',' + str(temp) + '\n')
 
     def print_log(self, per_atom):
         n = 1

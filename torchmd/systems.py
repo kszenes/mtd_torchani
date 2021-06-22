@@ -267,6 +267,44 @@ class System_ANI:
         phi = [15, 14, 8, 10] # Oxygen
 
         x = self.to_ase()
-        dihedrals = x.get_dihedrals([phi, psi])
+        dihedrals = x.get_dihedrals([psi, phi])
         dihedrals[dihedrals > 180] = dihedrals[dihedrals > 180] - 360 # Set between [-180, 180]
         return dihedrals
+
+    def get_dihedral_ani(self, v0, v1, v2):
+        v1n = v1 / torch.norm(v1)
+        v = -v0 - torch.einsum('ij, ij, ik -> ik', -v0, v1n, v1n)
+        w = v2 - torch.einsum('ij, ij, ik -> ik', v2, v1n, v1n)
+
+        x = torch.einsum('ij, ij -> i', v, w)
+        y = torch.einsum('ij, ij -> i', torch.cross(v1n, v, axis=1), w)
+        dihedral = torch.atan2(y, x)
+        return dihedral * 180 / np.pi
+
+    def get_dihedrals_ani(self):
+       psi = [7, 6, 8, 10] # Nitrogen
+       phi = [15, 14, 8, 10] # Oxygen 
+
+       x1 = self.pos[:, psi, :]
+       x2 = self.pos[:, phi, :]
+
+       vec1 = x1[:, 1:, :] - x1[:, :3, :]
+       vec2 = x2[:, 1:, :] - x2[:, :3, :]        
+       return torch.stack((self.get_dihedral_ani(vec1[:, 0, :], vec1[:, 1, :], vec1[:, 2,:]), self.get_dihedral_ani(vec2[:, 0, :], vec2[:, 1, :], vec2[:, 2,:])), axis=1)
+    #    return torch.tensor([self.get_dihedral_ani(vec1[:, 0, :], vec1[:, 1, :], vec1[:, 2,:]), self.get_dihedral_ani(vec2[:, 0, :], vec2[:, 1, :], vec2[:, 2,:])], requires_grad=True)
+
+
+    def get_bias(self, cv, peak, width=0.05, height=0.004336):
+        ''' 
+        https://www.sciencedirect.com/topics/biochemistry-genetics-and-molecular-biology/metadynamics
+        height = 0.1 kcal/mol = 0.004336 eV
+        width = 0.05
+        deposition rate = 2ps
+        sampling time = 500ns
+        '''
+        return height * torch.exp(- (cv - peak)**2 / (2 * width**2))
+        
+
+
+
+
