@@ -92,19 +92,20 @@ class System_ANI:
         # self.vel = vel  # Nsystems,Natoms,3
         # self.box = box
         # self.forces = forces
-        self.box = torch.zeros(nreplicas, 3, 3)
-        self.pos = torch.zeros(nreplicas, natoms, 3)
-        self.vel = torch.zeros(nreplicas, natoms, 3)
-        self.forces = torch.zeros(nreplicas, natoms, 3)
+        #self.box = torch.zeros(nreplicas, 3, 3)
+        #self.pos = torch.zeros(nreplicas, natoms, 3)
 
-        self.model = model
-        self.pos = pos
-        self.species = species
-        self.masses = masses
+        self.vel = torch.zeros(nreplicas, natoms, 3, device=device)
+        self.forces = torch.zeros(nreplicas, natoms, 3, device=device)
+
+        self.model = model.to(device)
+        self.pos = pos.type(precision).to(device)
+        self.species = species.to(device)
+        self.masses = masses.type(precision).to(device)
         self.symbols = symbols
 
-        self.precision_(precision)
-        self.to_(device)
+        #self.precision_(precision)
+        #self.to_(device)
 
         self.compute_forces()
 
@@ -235,18 +236,18 @@ class System_ANI:
 
     def compute_forces(self):
 
-        energy = torchani.units.hartree2ev(self.model((self.species, self.pos)).energies)
-        self.energy = energy
-        forces = -torch.autograd.grad(energy.sum(), self.pos)[0]
-        self.forces = forces
+       # energy = torchani.units.hartree2ev(self.model((self.species, self.pos)).energies)
+       #self.energy = energy
+       #forces = -torch.autograd.grad(energy.sum(), self.pos)[0]
+       #self.forces = forces
         
 
-        # Works but copies
-        # pos = self.pos.float().requires_grad_(True)
-        # energy = torchani.units.hartree2ev(self.model((self.species, pos)).energies)
-        # self.energy = energy
-        # forces = -torch.autograd.grad(energy.sum(), pos)[0]
-        # self.forces = forces
+        #Works but copies
+        pos = self.pos.requires_grad_(True)
+        energy = torchani.units.hartree2ev(self.model((self.species, pos)).energies)
+        self.energy = energy
+        forces = -torch.autograd.grad(energy.sum(), pos)[0]
+        self.forces = forces
 
     def set_species(self, species):
         self.species = species

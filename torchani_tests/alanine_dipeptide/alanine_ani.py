@@ -1,6 +1,6 @@
 # %%
 import sys
-sys.path.append("/Users/kalmanszenes/code/mtd_torchani/torchmd")
+sys.path.append("/data/kszenes/mtd_torchani/torchmd")
 
 import torch
 # from torchmd.integrator import maxwell_boltzmann, kinetic_energy, kinetic_to_temp
@@ -21,6 +21,7 @@ from ase.io import read
 structure = sys.argv[1]
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 precision = torch.float
 
 model = torchani.models.ANI1ccx(periodic_table_index=True).to(device) # ASE
@@ -32,7 +33,7 @@ alanine_ase.set_calculator(model.ase())
 alanine_ase.get_kinetic_energy()
 
 
-system_ani = System_ANI.from_ase(alanine_ase)
+system_ani = System_ANI.from_ase(alanine_ase, device=device)
 
 system_ani.set_velocities(maxwell_boltzmann(system_ani.masses, T=300, replicas=1, device=device))
 print(system_ani.get_kinetic_energy())
@@ -75,8 +76,9 @@ print(system_ani.get_dihedrals_ani())
 
 # %%
 from minimizers import minimize_pytorch_bfgs_ANI
-minimize_pytorch_bfgs_ANI(system_ani, steps=1000)
 print(system_ani.pos)
+#minimize_pytorch_bfgs_ANI(system_ani, steps=1000)
+#print(system_ani.pos)
 
 #%%
 # ---------- Torchani ---------
@@ -95,7 +97,7 @@ print_iter = 1
 
 # cProfile.run('integrator_ani.run(n_iter, device=device)')
 
-integrator_ani.run(n_iter, log_file='log/alanine_ani_B.csv', log_interval=print_iter, device=device)
+integrator_ani.run(n_iter, log_file='log/' + sys.argv[1] + '.csv', log_interval=print_iter, device=device)
 
 # %%
 # import nglview as nv

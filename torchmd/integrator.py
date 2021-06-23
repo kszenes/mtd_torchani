@@ -179,7 +179,8 @@ class Langevin_integrator:
 
         self.vel += (self.c1 * forces / self.masses - self.c2 * self.vel +
                 self.c3 * self.xi - self.c4 * self.eta)
-        x = system.get_positions()
+        with torch.no_grad():
+            x = system.get_positions()
         system.set_positions(x + self.dt * self.vel + self.c5 * self.eta)
 
         self.vel = (self.system.get_positions() - x -
@@ -188,6 +189,7 @@ class Langevin_integrator:
 
         self.vel += (self.c1 * forces / self.masses - self.c2 * self.vel +
                 self.c3 * self.xi - self.c4 * self.eta)
+        print(system.pos)
 
         system.set_velocities(self.vel)
 
