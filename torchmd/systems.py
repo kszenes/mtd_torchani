@@ -99,7 +99,7 @@ class System_ANI:
         self.forces = torch.zeros(nreplicas, natoms, 3, device=device)
 
         self.model = model.to(device)
-        self.pos = pos.type(precision).to(device)
+        self.pos = pos.type(precision).requires_grad_(True).to(device)
         self.species = species.to(device)
         self.masses = masses.type(precision).to(device)
         self.symbols = symbols
@@ -123,7 +123,7 @@ class System_ANI:
     def to_(self, device):
         self.forces = self.forces.to(device)
         self.box = self.box.to(device)
-        self.pos = self.pos.requires_grad_(True).to(device)
+        self.pos = self.pos.to(device)
         self.vel = self.vel.to(device)
 
         self.model = self.model.to(device)
@@ -236,10 +236,12 @@ class System_ANI:
 
     def compute_forces(self):
 
-       # energy = torchani.units.hartree2ev(self.model((self.species, self.pos)).energies)
-       #self.energy = energy
-       #forces = -torch.autograd.grad(energy.sum(), self.pos)[0]
-       #self.forces = forces
+    #    self.pos.requires_grad_(True)
+    #    energy = torchani.units.hartree2ev(self.model((self.species, self.pos)).energies)
+    #    self.energy = energy
+    #    forces = -torch.autograd.grad(energy.sum(), self.pos)[0]
+    #    self.forces = forces
+    #    self.pos.requires_grad_(False)
         
 
         #Works but copies
@@ -272,7 +274,7 @@ class System_ANI:
         dihedrals[dihedrals > 180] = dihedrals[dihedrals > 180] - 360 # Set between [-180, 180]
         return dihedrals
 
-    def get_dihedral_ani(self, v0, v1, v2):
+    def get_dihedral_ani(self, v0, v1, v2, degree=False):
         v1n = v1 / torch.norm(v1)
         v = -v0 - torch.einsum('ij, ij, ik -> ik', -v0, v1n, v1n)
         w = v2 - torch.einsum('ij, ij, ik -> ik', v2, v1n, v1n)
@@ -280,7 +282,15 @@ class System_ANI:
         x = torch.einsum('ij, ij -> i', v, w)
         y = torch.einsum('ij, ij -> i', torch.cross(v1n, v, axis=1), w)
         dihedral = torch.atan2(y, x)
-        return dihedral * 180 / np.pi
+        if degree == True:
+            dihedral *= 180 / np.pi
+        return dihedral
+
+    def get_phi(self):
+       phi = [15, 14, 8, 10]
+       x = self.pos[:, phi, :].requires_grad_(True)
+       vec = x[:, 1:, :] - x[:, :3, :]
+       return self.get_dihedral_ani(vec[:, 0, :], vec[:, 1, :], vec[:, 2, :])
 
     def get_dihedrals_ani(self):
        psi = [7, 6, 8, 10] # Nitrogen

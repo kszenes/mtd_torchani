@@ -5,6 +5,7 @@ import ase.units
 
 import time
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 TIMEFACTOR = 48.88821
 BOLTZMAN = 0.001987191
@@ -139,13 +140,15 @@ class Integrator_ANI:
 
 
 class Langevin_integrator:
-    def __init__(self, system, dt, device, fr=None, temp=None, fix_com=True):
+    def __init__(self, system, dt, device, fr=None, temp=None, fix_com=True, height=0.004336, width=0.05):
         self.fr = fr 
         self.temp = temp * ase.units.kB
         self.dt = dt * ase.units.fs
         self.system = system
         self.masses = self.system.masses
         self.fix_com = fix_com
+        self.height = height
+        self.width = width
 
         self.updatevars()
 
@@ -170,7 +173,7 @@ class Langevin_integrator:
             forces = system.get_forces()
 
         if metadyn is not None:
-            forces += self.get_bias_forces()
+            forces += self.get_bias_forces(self.system.get_phi())
 
         self.vel = system.get_velocities()
 
@@ -179,8 +182,8 @@ class Langevin_integrator:
 
         self.vel += (self.c1 * forces / self.masses - self.c2 * self.vel +
                 self.c3 * self.xi - self.c4 * self.eta)
-        with torch.no_grad():
-            x = system.get_positions()
+
+        x = system.get_positions().detach()
         system.set_positions(x + self.dt * self.vel + self.c5 * self.eta)
 
         self.vel = (self.system.get_positions() - x -
@@ -189,8 +192,6 @@ class Langevin_integrator:
 
         self.vel += (self.c1 * forces / self.masses - self.c2 * self.vel +
                 self.c3 * self.xi - self.c4 * self.eta)
-        print(system.pos)
-
         system.set_velocities(self.vel)
 
         # return system.get_kinetic_energy(), system.get_potential_energy(), system.get_temperature()
@@ -208,7 +209,7 @@ class Langevin_integrator:
             # log_f.write('Epot,' + 'Ekin,' + 'Etot,' + 'Temp\n')
 
         if metadyn is not None:
-            self.history = metadyn_func
+            self.peaks = self.system.get_phi().detach()
 
         for i in tqdm(range(n_iter)):
             if traj_file is not None and i % traj_interval == 0:
@@ -221,6 +222,9 @@ class Langevin_integrator:
                     self.write_log(log_f, per_atom)
 
             self.step(metadyn=metadyn, device=device)
+            if metadyn is not None and i % 20 == 19:
+                self.peaks = torch.cat((self.peaks, (self.system.get_phi().detach())))
+
 
         if traj_file is not None:
             traj_f.close()
@@ -231,7 +235,7 @@ class Langevin_integrator:
         # run_time = time.time() - start_time
         # print(f"----------- Simulation took {(run_time):.2f} sec ({(n_iter/run_time):.2f} iters/sec) -----------")
 
-    def get_bias(self, cv, peak, width=0.05, height=0.004336):
+    def get_bias(self, cv):
         ''' 
         https://www.sciencedirect.com/topics/biochemistry-genetics-and-molecular-biology/metadynamics
         height = 0.1 kcal/mol = 0.004336 eV
@@ -239,7 +243,20 @@ class Langevin_integrator:
         deposition rate = 2ps
         sampling time = 500ns
         '''
-        return height * torch.exp(- (cv - peak)**2 / (2 * width**2))
+        return self.height * torch.exp(- (cv - self.peaks)**2 / (2 * self.width**2))
+
+    def get_bias_forces(self, cv):
+        bias = self.get_bias(cv)
+        f_bias = -torch.autograd.grad(bias.sum(), self.system.pos)[0]
+        return f_bias
+
+    def plot_free_energy(self, x_points=1000):
+        x_range = torch.arange(-np.pi, np.pi, 2*np.pi/x_points)
+        gauss = - height * torch.sum(torch.exp(-(x_range - self.peaks[:,None])**2 / (2*width**2)), dim=0)
+        plt.plot(x_range, gauss)
+        return torch.tensor((x_range, gauss))
+
+
 
     def write_traj(self, traj_file):
         atom_types = self.system.get_symbols()

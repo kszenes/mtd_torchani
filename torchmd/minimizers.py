@@ -77,13 +77,13 @@ def minimize_pytorch_bfgs_ANI(system,steps=1000):
     if steps == 0:
         return
 
-    opt = torch.optim.LBFGS([system.pos], max_iter=steps, tolerance_change=1e-09)
-    # pos = system.pos.float().requires_grad_(True)
-    # opt = torch.optim.LBFGS([pos], max_iter=steps, tolerance_change=1e-09)
+    # opt = torch.optim.LBFGS([system.pos], max_iter=steps, tolerance_change=1e-09)
+    pos = system.get_positions()
+    opt = torch.optim.LBFGS([pos], max_iter=steps, tolerance_change=1e-09)
 
     def closure(step):
         opt.zero_grad()
-        E = hartree2ev(system.model((system.species, system.pos)).energies)
+        E = hartree2ev(system.model((system.species, pos)).energies)
         system.energy = E
         E.backward()
         maxforce = float(torch.max(torch.norm(system.pos.grad, dim=1)))
@@ -96,4 +96,4 @@ def minimize_pytorch_bfgs_ANI(system,steps=1000):
     opt.step(lambda: closure(step))
 
     # system.pos[:] = pos.detach().requires_grad_(False)
-    # system.pos = pos.requires_grad_(False)
+    system.set_positions(pos)

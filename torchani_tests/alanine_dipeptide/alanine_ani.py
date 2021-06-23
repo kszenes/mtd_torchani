@@ -1,6 +1,6 @@
 # %%
 import sys
-sys.path.append("/data/kszenes/mtd_torchani/torchmd")
+sys.path.append("/Users/kalmanszenes/code/mtd_torchani/torchmd")
 
 import torch
 # from torchmd.integrator import maxwell_boltzmann, kinetic_energy, kinetic_to_temp
@@ -18,7 +18,8 @@ from ase.io import read
 
 # np.random.seed(0)
 # torch.manual_seed(0)
-structure = sys.argv[1]
+# structure = sys.argv[1]
+structure = 'dialaA.pdb'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
@@ -41,43 +42,36 @@ print(system_ani.get_temperature())
 # print(f'Ekin = {kinetic_to_temp(kinetic_energy(system_ani.masses, system_ani.vel), len(system_ani.masses))}')
 # # system_ani.set_masses(masses)
 # print(system_ani.energy, "\n", torch.max(system_ani.forces), torch.min(system_ani.forces))
-print(system_ani.forces)
+# print(system_ani.forces)
 # print(system_ani.pos)
 
-psi = [7, 6, 8, 10] # Nitrogen
-phi = [15, 14, 8, 10] # Oxygen
+psi_list = [7, 6, 8, 10] # Nitrogen
+phi_list = [15, 14, 8, 10] # Oxygen
 
-print(system_ani.get_dihedrals())
-print(system_ani.get_dihedrals_ani())
+# print(system_ani.get_dijj
+# print(system_ani.get_dihedrals_ani())
+# print(system_ani.get_phi())
+print(system_ani.get_positions())
 
-# # %%
-# # --------- Dihedrals testing ----------
-# dihedrals = torch.tensor([1, 2])
-# offset = torch.tensor([[1, -1], [-1, 3]])
-# torch.exp(dihedrals + offset)
-
-# # %%
+# %%
 # height = 0.004336
 # width = 0.05
 
-# dihedrals = system_ani.get_dihedrals_ani()
-# offset = torch.tensor([[1, 2]])
-# offset_2 = torch.tensor([[2, 1]])
-# peaks = torch.stack((dihedrals.detach() + offset, dihedrals.detach() + offset_2), axis=1)
-# # peaks = dihedrals.detach() + offset
+# phi = system_ani.get_phi()
+# peaks = torch.tensor([phi.detach() + 0.1, phi.detach() + 0.2])
 
-# bias = system_ani.get_bias(dihedrals, peaks, height=height, width=width)
+# bias = system_ani.get_bias(phi, peaks, height=1, width=1)
 # bias
 # # bias = system_ani.get_bias(dihedrals, dihedrals.detach() + offset, height=0.004336, width=0.05) + system_ani.get_bias(dihedrals, dihedrals.detach() - 2 * offset, height=0.004336, width=0.05)
 
-# # %%
+# %%
 # f_bias = -torch.autograd.grad(bias.sum(), system_ani.pos)[0]
 # f_bias
 
 # %%
-from minimizers import minimize_pytorch_bfgs_ANI
-print(system_ani.pos)
-#minimize_pytorch_bfgs_ANI(system_ani, steps=1000)
+# from minimizers import minimize_pytorch_bfgs_ANI
+# print(system_ani.pos)
+# minimize_pytorch_bfgs_ANI(system_ani, steps=1000)
 #print(system_ani.pos)
 
 #%%
@@ -88,17 +82,32 @@ from ase.units import eV, Hartree, kB
 langevin_temperature = 300  # K
 langevin_gamma = 0.2
 timestep = 1  # fs
+height=0.004336
+width=0.05
 
-integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_gamma, temp=langevin_temperature)
+
+integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_gamma, temp=langevin_temperature, height=height, width=width)
 
 # %%
-n_iter = int(1e4)
+n_iter = int(2)
 print_iter = 1
 
 # cProfile.run('integrator_ani.run(n_iter, device=device)')
 
-integrator_ani.run(n_iter, log_file='log/' + sys.argv[1] + '.csv', log_interval=print_iter, device=device)
+integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn=True)
 
+
+# %%
+# torch.sub(torch.arange(-np.pi, np.pi, 2*np.pi/1000), integrator_ani.peaks)
+width=0.05
+height=0.004336
+x_range = torch.arange(-np.pi, np.pi, 2*np.pi/1000)
+gauss = - height * torch.sum(torch.exp(-(x_range - integrator_ani.peaks[:,None])**2 / (2*width**2)), dim=0)
+import matplotlib.pyplot as plt
+plt.plot(x_range, gauss)
+
+# %%
+test = height * torch.exp()
 # %%
 # import nglview as nv
 # from ase.io import read
