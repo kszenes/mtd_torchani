@@ -242,6 +242,10 @@ class Langevin_integrator:
         width = 0.05
         deposition rate = 2ps
         sampling time = 500ns
+
+        Plumed masterclass 21-4.2
+        initial height = 1.2 kcal/mol = 0.052 eV
+        bias factor = 8
         '''
         return self.height * torch.exp(- (cv - self.peaks)**2 / (2 * self.width**2))
 
@@ -250,11 +254,16 @@ class Langevin_integrator:
         f_bias = -torch.autograd.grad(bias.sum(), self.system.pos)[0]
         return f_bias
 
-    def plot_free_energy(self, x_points=1000):
+    def get_gauss_height(self, cv, well_tempered=False):
+        if not well_tempered:
+            return self.height
+
+    def get_free_energy(self, x_points=1000):
         x_range = torch.arange(-np.pi, np.pi, 2*np.pi/x_points)
-        gauss = - height * torch.sum(torch.exp(-(x_range - self.peaks[:,None])**2 / (2*width**2)), dim=0)
+        gauss = - self.height * torch.sum(torch.exp(-(x_range - self.peaks[:,None])**2 / (2*self.width**2)), dim=0)
         plt.plot(x_range, gauss)
-        return torch.tensor((x_range, gauss))
+        plt.show()
+        return torch.stack((x_range, gauss), dim=1)
 
 
 

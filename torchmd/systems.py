@@ -266,11 +266,11 @@ class System_ANI:
 
     def get_dihedrals(self):
         # only used for psi phi angles in ramachandran
-        psi = [7, 6, 8, 10] # Nitrogen
-        phi = [15, 14, 8, 10] # Oxygen
+        psi_list = [6, 8, 14, 16]
+        phi_list = [4, 6, 8, 14]
 
         x = self.to_ase()
-        dihedrals = x.get_dihedrals([psi, phi])
+        dihedrals = x.get_dihedrals([psi_list, phi_list])
         dihedrals[dihedrals > 180] = dihedrals[dihedrals > 180] - 360 # Set between [-180, 180]
         return dihedrals
 
@@ -287,17 +287,17 @@ class System_ANI:
         return dihedral
 
     def get_phi(self):
-       phi = [15, 14, 8, 10]
-       x = self.pos[:, phi, :].requires_grad_(True)
+       phi_list = [4, 6, 8, 14]
+       x = self.pos[:, phi_list, :].requires_grad_(True)
        vec = x[:, 1:, :] - x[:, :3, :]
        return self.get_dihedral_ani(vec[:, 0, :], vec[:, 1, :], vec[:, 2, :])
 
     def get_dihedrals_ani(self):
-       psi = [7, 6, 8, 10] # Nitrogen
-       phi = [15, 14, 8, 10] # Oxygen 
+       psi_list = [6, 8, 14, 16]
+       phi_list = [4, 6, 8, 14]
 
-       x1 = self.pos[:, psi, :]
-       x2 = self.pos[:, phi, :]
+       x1 = self.pos[:, psi_list, :]
+       x2 = self.pos[:, phi_list, :]
 
        vec1 = x1[:, 1:, :] - x1[:, :3, :]
        vec2 = x2[:, 1:, :] - x2[:, :3, :]        

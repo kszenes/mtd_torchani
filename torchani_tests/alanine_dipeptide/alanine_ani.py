@@ -45,13 +45,17 @@ print(system_ani.get_temperature())
 # print(system_ani.forces)
 # print(system_ani.pos)
 
-psi_list = [7, 6, 8, 10] # Nitrogen
-phi_list = [15, 14, 8, 10] # Oxygen
+psi_list = [6, 8, 14, 16]
+phi_list = [4, 6, 8, 14]
+
+# alanine_ase.get_dihedrals([psi_list, phi_list])
+
 
 # print(system_ani.get_dijj
-# print(system_ani.get_dihedrals_ani())
+# print(system_ani.get_dihedrals_ani() * 180 / np.pi)
 # print(system_ani.get_phi())
-print(system_ani.get_positions())
+# print(system_ani.get_positions())
+
 
 # %%
 # height = 0.004336
@@ -69,57 +73,60 @@ print(system_ani.get_positions())
 # f_bias
 
 # %%
-# from minimizers import minimize_pytorch_bfgs_ANI
-# print(system_ani.pos)
-# minimize_pytorch_bfgs_ANI(system_ani, steps=1000)
-#print(system_ani.pos)
+from minimizers import minimize_pytorch_bfgs_ANI
+print(system_ani.pos)
+minimize_pytorch_bfgs_ANI(system_ani, steps=1000)
+print(system_ani.pos)
 
 #%%
 # ---------- Torchani ---------
-from integrator import Integrator_ANI, Langevin_integrator
-from ase.units import eV, Hartree, kB
+# from integrator import Integrator_ANI, Langevin_integrator
+# from ase.units import eV, Hartree, kB
 
-langevin_temperature = 300  # K
-langevin_gamma = 0.2
-timestep = 1  # fs
-height=0.004336
-width=0.05
-
-
-integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_gamma, temp=langevin_temperature, height=height, width=width)
-
-# %%
-n_iter = int(2)
-print_iter = 1
-
-# cProfile.run('integrator_ani.run(n_iter, device=device)')
-
-integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn=True)
+# langevin_temperature = 300  # K
+# langevin_gamma = 0.2
+# timestep = 1  # fs
+# height=0.004336
+# width=0.05
 
 
-# %%
-# torch.sub(torch.arange(-np.pi, np.pi, 2*np.pi/1000), integrator_ani.peaks)
-width=0.05
-height=0.004336
-x_range = torch.arange(-np.pi, np.pi, 2*np.pi/1000)
-gauss = - height * torch.sum(torch.exp(-(x_range - integrator_ani.peaks[:,None])**2 / (2*width**2)), dim=0)
-import matplotlib.pyplot as plt
-plt.plot(x_range, gauss)
+# integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_gamma, temp=langevin_temperature, height=height, width=width)
 
-# %%
-test = height * torch.exp()
-# %%
+# # %%
+# n_iter = int(1e5)
+# print_iter = 1
+
+# # cProfile.run('integrator_ani.run(n_iter, device=device)')
+
+# integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn=True)
+
+
+# # %%
+# free_e = integrator_ani.get_free_energy()
+# # torch.sub(torch.arange(-np.pi, np.pi, 2*np.pi/1000), integrator_ani.peaks)
+# # width=0.05
+# # height=0.004336
+# # x_range = torch.arange(-np.pi, np.pi, 2*np.pi/1000)
+# # gauss = - height * torch.sum(torch.exp(-(x_range - integrator_ani.peaks[:,None])**2 / (2*width**2)), dim=0)
+# # import matplotlib.pyplot as plt
+# # plt.plot(x_range, gauss)
+
+
+# # %%
 # import nglview as nv
 # from ase.io import read
-# nv.show_asetraj(read('alanine_ani.xyz', index=':'), gui=True)
-# %%
+# nv.show_asetraj(read('log/dialaA.xyz', index=':'), gui=True)
+# # %%
 # import pandas as pd
-# df = pd.read_csv('alanine_ani.csv', skiprows=1)
+# df = pd.read_csv('log/dialaA.csv', skiprows=1)
 # df
 # # %%
 # import matplotlib.pyplot as plt
 # plt.scatter(df['Phi'], df['Psi'], marker='.')
 # plt.xlabel('Phi degrees')
 # plt.ylabel('Psi degrees')
-# %%
-# %%
+# # %%
+# df['Phi'].plot()
+# # %%
+# df['Psi'].plot()
+# # %%
