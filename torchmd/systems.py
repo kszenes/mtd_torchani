@@ -292,6 +292,12 @@ class System_ANI:
        vec = x[:, 1:, :] - x[:, :3, :]
        return self.get_dihedral_ani(vec[:, 0, :], vec[:, 1, :], vec[:, 2, :])
 
+    def get_psi(self):
+       psi_list = [6, 8, 14, 16]
+       x = self.pos[:, psi_list, :].requires_grad_(True)
+       vec = x[:, 1:, :] - x[:, :3, :]
+       return self.get_dihedral_ani(vec[:, 0, :], vec[:, 1, :], vec[:, 2, :])
+
     def get_dihedrals_ani(self):
        psi_list = [6, 8, 14, 16]
        phi_list = [4, 6, 8, 14]
@@ -301,7 +307,7 @@ class System_ANI:
 
        vec1 = x1[:, 1:, :] - x1[:, :3, :]
        vec2 = x2[:, 1:, :] - x2[:, :3, :]        
-       return torch.stack((self.get_dihedral_ani(vec1[:, 0, :], vec1[:, 1, :], vec1[:, 2,:]), self.get_dihedral_ani(vec2[:, 0, :], vec2[:, 1, :], vec2[:, 2,:])), axis=1)
+       return torch.stack((self.get_dihedral_ani(vec1[:, 0, :], vec1[:, 1, :], vec1[:, 2,:]), self.get_dihedral_ani(vec2[:, 0, :], vec2[:, 1, :], vec2[:, 2,:])), axis=0)
     #    return torch.tensor([self.get_dihedral_ani(vec1[:, 0, :], vec1[:, 1, :], vec1[:, 2,:]), self.get_dihedral_ani(vec2[:, 0, :], vec2[:, 1, :], vec2[:, 2,:])], requires_grad=True)
 
 

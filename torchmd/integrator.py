@@ -173,7 +173,7 @@ class Langevin_integrator:
             forces = system.get_forces()
 
         if metadyn is not None:
-            forces += self.get_bias_forces(self.system.get_phi())
+            forces += self.get_bias_forces(self.get_cv())
 
         self.vel = system.get_velocities()
 
@@ -209,7 +209,8 @@ class Langevin_integrator:
             # log_f.write('Epot,' + 'Ekin,' + 'Etot,' + 'Temp\n')
 
         if metadyn is not None:
-            self.peaks = self.system.get_phi().detach()
+            self.peaks = self.get_cv().detach()
+            self.n_cv = len(self.peaks)
 
         for i in tqdm(range(n_iter)):
             if traj_file is not None and i % traj_interval == 0:
@@ -223,7 +224,10 @@ class Langevin_integrator:
 
             self.step(metadyn=metadyn, device=device)
             if metadyn is not None and i % 20 == 19:
-                self.peaks = torch.cat((self.peaks, (self.system.get_phi().detach())))
+                if self.n_cv > 1:
+                    self.peaks = torch.cat((self.peaks, (self.get_cv().detach())), dim=self.n_cv-1) # high-dim potential
+                else:
+                    self.peaks = torch.cat((self.peaks, (self.get_cv().detach()))) # 1d potential
 
 
         if traj_file is not None:
@@ -234,6 +238,9 @@ class Langevin_integrator:
 
         # run_time = time.time() - start_time
         # print(f"----------- Simulation took {(run_time):.2f} sec ({(n_iter/run_time):.2f} iters/sec) -----------")
+
+    def get_cv(self):
+        return self.system.get_phi()
 
     def get_bias(self, cv):
         ''' 
@@ -247,7 +254,11 @@ class Langevin_integrator:
         initial height = 1.2 kcal/mol = 0.052 eV
         bias factor = 8
         '''
-        return self.height * torch.exp(- (cv - self.peaks)**2 / (2 * self.width**2))
+        if self.n_cv > 1:
+            return self.height * torch.prod(torch.exp(- (cv - self.peaks)**2 / (2 * self.width**2)), dim=0)
+        else:
+            return self.height * torch.exp(- (cv - self.peaks)**2 / (2 * self.width**2))
+
 
     def get_bias_forces(self, cv):
         bias = self.get_bias(cv)
@@ -258,8 +269,11 @@ class Langevin_integrator:
         if not well_tempered:
             return self.height
 
-    def get_free_energy(self, x_points=1000):
-        x_range = torch.arange(-np.pi, np.pi, 2*np.pi/x_points)
+    def get_free_energy(self, n_points=1000):
+        # phi_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
+        # psi_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
+        x_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
+        # discretisation = torch.stack((psi_range, x_range), dim=0)
         gauss = - self.height * torch.sum(torch.exp(-(x_range - self.peaks[:,None])**2 / (2*self.width**2)), dim=0)
         plt.plot(x_range, gauss)
         plt.show()
@@ -290,7 +304,8 @@ class Langevin_integrator:
         # log_file.write(str(epot) +  ',' + str(ekin) + ',' + str(etot) + ',' + str(temp) + '\n')
 
 
-        psi, phi = self.system.get_dihedrals_ani()[0]
+        psi = self.system.get_dihedrals_ani()[0]
+        phi = self.system.get_dihedrals_ani()[1]
         log_file.write(str(epot) +  ',' + str(ekin) + ',' + str(etot) + ',' + str(phi.item()) + ',' + str(psi.item()) + ',' + str(temp) + '\n')
 
     def print_log(self, per_atom):

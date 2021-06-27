@@ -14,12 +14,13 @@ import nglview as nv
 import ase
 from ase.io import read
 
-# import cProfile
+import cProfile
+import pstats
 
 # np.random.seed(0)
 # torch.manual_seed(0)
 # structure = sys.argv[1]
-structure = 'dialaA.pdb'
+structure = 'dialaB.pdb'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
@@ -80,29 +81,38 @@ print(system_ani.pos)
 
 #%%
 # ---------- Torchani ---------
-# from integrator import Integrator_ANI, Langevin_integrator
-# from ase.units import eV, Hartree, kB
+from integrator import Integrator_ANI, Langevin_integrator
+from ase.units import eV, Hartree, kB
 
-# langevin_temperature = 300  # K
-# langevin_gamma = 0.2
-# timestep = 1  # fs
-# height=0.004336
-# width=0.05
-
-
-# integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_gamma, temp=langevin_temperature, height=height, width=width)
-
-# # %%
-# n_iter = int(1e5)
-# print_iter = 1
-
-# # cProfile.run('integrator_ani.run(n_iter, device=device)')
-
-# integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn=True)
+langevin_temperature = 300  # K
+langevin_gamma = 0.2
+timestep = 1  # fs
+height=0.004336
+width=0.05
 
 
-# # %%
-# free_e = integrator_ani.get_free_energy()
+integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_gamma, temp=langevin_temperature, height=height, width=width)
+
+# %%
+n_iter = int(1e2)
+with cProfile.Profile() as pr:
+  integrator_ani.run(n_iter, device=device)
+
+# %%
+stats = pstats.Stats(pr)
+stats.sort_stats(pstats.SortKey.TIME)
+stats.dump_stats(filename='profiling.prog')
+# %%
+n_iter = int(1e6)
+print_iter = 1
+
+# cProfile.run('integrator_ani.run(n_iter, device=device)')
+
+integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn=True)
+
+
+# %%
+free_e = integrator_ani.get_free_energy()
 # # torch.sub(torch.arange(-np.pi, np.pi, 2*np.pi/1000), integrator_ani.peaks)
 # # width=0.05
 # # height=0.004336
@@ -111,8 +121,16 @@ print(system_ani.pos)
 # # import matplotlib.pyplot as plt
 # # plt.plot(x_range, gauss)
 
+# %%
+import pandas as pd, matplotlib.pyplot as plt
+df = pd.read_csv('log/' + structure.split('.')[0] + '.csv', skiprows=1)
+# %%
+plt.scatter(df['Psi'][::100], df['Phi'][::100], marker='.')
+plt.xlabel('$Phi$ / rad')
+plt.ylabel('$Psi$ / rad')
 
-# # %%
+
+# %%
 # import nglview as nv
 # from ase.io import read
 # nv.show_asetraj(read('log/dialaA.xyz', index=':'), gui=True)
@@ -130,3 +148,5 @@ print(system_ani.pos)
 # # %%
 # df['Psi'].plot()
 # # %%
+
+# %%
