@@ -1,6 +1,7 @@
 # %%
 import sys
-sys.path.append("/Users/kalmanszenes/code/mtd_torchani/torchmd")
+# sys.path.append("/Users/kalmanszenes/code/mtd_torchani/torchmd")
+sys.path.append("/data/kszenes/mtd_torchani/torchmd")
 
 import torch
 # from torchmd.integrator import maxwell_boltzmann, kinetic_energy, kinetic_to_temp
@@ -22,9 +23,9 @@ import pstats
 # structure = sys.argv[1]
 structure = 'dialaB.pdb'
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 print(device)
-precision = torch.float
+precision = torch.float32
 
 model = torchani.models.ANI1ccx(periodic_table_index=True).to(device) # ASE
 # model = torchani.models.ANI2x(periodic_table_index=True).to(device) # non-ASE
@@ -95,6 +96,8 @@ integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_g
 
 # %%
 n_iter = int(1e2)
+
+# %%
 with cProfile.Profile() as pr:
   integrator_ani.run(n_iter, device=device)
 
@@ -103,7 +106,7 @@ stats = pstats.Stats(pr)
 stats.sort_stats(pstats.SortKey.TIME)
 stats.dump_stats(filename='profiling.prog')
 # %%
-n_iter = int(1e6)
+n_iter = int(1e2)
 print_iter = 1
 
 # cProfile.run('integrator_ani.run(n_iter, device=device)')

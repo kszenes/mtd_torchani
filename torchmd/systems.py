@@ -99,7 +99,7 @@ class System_ANI:
         self.forces = torch.zeros(nreplicas, natoms, 3, device=device)
 
         self.model = model.to(device)
-        self.pos = pos.type(precision).requires_grad_(True).to(device)
+        self.pos = pos.type(precision).to(device).requires_grad_(True)
         self.species = species.to(device)
         self.masses = masses.type(precision).to(device)
         self.symbols = symbols
@@ -137,7 +137,7 @@ class System_ANI:
         self.vel = self.vel.type(precision)
 
     @classmethod
-    def from_ase(cls, ase_struct, device='cpu', precision='torch.float'):
+    def from_ase(cls, ase_struct, device='cuda', precision='torch.float32'):
         x = cls(torchani.models.ANI1ccx(periodic_table_index=True), torch.from_numpy(ase_struct.get_positions()).reshape(1, -1, 3),
         torch.tensor(ase_struct.get_atomic_numbers()).reshape(1, -1), torch.tensor(ase_struct.get_masses()).reshape(-1, 1),
         len(ase_struct), ase_struct.get_chemical_symbols(), 1, torch.float, device)
