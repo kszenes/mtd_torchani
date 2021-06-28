@@ -1,7 +1,7 @@
 # %%
 import sys
-# sys.path.append("/Users/kalmanszenes/code/mtd_torchani/torchmd")
-sys.path.append("/data/kszenes/mtd_torchani/torchmd")
+sys.path.append("/Users/kalmanszenes/code/mtd_torchani/torchmd")
+# sys.path.append("/data/kszenes/mtd_torchani/torchmd")
 
 import torch
 # from torchmd.integrator import maxwell_boltzmann, kinetic_energy, kinetic_to_temp
@@ -17,6 +17,8 @@ from ase.io import read
 
 import cProfile
 import pstats
+
+import matplotlib.pyplot as plt
 
 # np.random.seed(0)
 # torch.manual_seed(0)
@@ -53,7 +55,8 @@ phi_list = [4, 6, 8, 14]
 # alanine_ase.get_dihedrals([psi_list, phi_list])
 
 
-# print(system_ani.get_dijj
+print(system_ani.get_dihedrals_ani())
+print(system_ani.get_dihedrals_ani().shape)
 # print(system_ani.get_dihedrals_ani() * 180 / np.pi)
 # print(system_ani.get_phi())
 # print(system_ani.get_positions())
@@ -95,23 +98,28 @@ width=0.05
 integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_gamma, temp=langevin_temperature, height=height, width=width)
 
 # %%
-n_iter = int(1e2)
+# n_iter = int(1e2)
 
 # %%
-with cProfile.Profile() as pr:
-  integrator_ani.run(n_iter, device=device)
+# with cProfile.Profile() as pr:
+#   integrator_ani.run(n_iter, device=device)
 
+# # %%
+# stats = pstats.Stats(pr)
+# stats.sort_stats(pstats.SortKey.TIME)
+# stats.dump_stats(filename='profiling.prog')
 # %%
-stats = pstats.Stats(pr)
-stats.sort_stats(pstats.SortKey.TIME)
-stats.dump_stats(filename='profiling.prog')
-# %%
-n_iter = int(1e2)
+n_iter = int(1e5)
 print_iter = 1
+append = False
 
 # cProfile.run('integrator_ani.run(n_iter, device=device)')
 
-integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn=True)
+# ---------- Standard metad
+# integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn=True, dTemp=None)
+
+# ----------- Well-tempered metad
+integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn='well-tempered', dTemp=8*langevin_temperature, append=append)
 
 
 # %%
@@ -128,15 +136,17 @@ free_e = integrator_ani.get_free_energy()
 import pandas as pd, matplotlib.pyplot as plt
 df = pd.read_csv('log/' + structure.split('.')[0] + '.csv', skiprows=1)
 # %%
-plt.scatter(df['Psi'][::100], df['Phi'][::100], marker='.')
+plt.scatter(df['Phi'], df['Psi'], marker='.', s=1)
 plt.xlabel('$Phi$ / rad')
 plt.ylabel('$Psi$ / rad')
+plt.xlim(-np.pi, np.pi)
+plt.ylim(-np.pi, np.pi)
 
 
 # %%
-# import nglview as nv
-# from ase.io import read
-# nv.show_asetraj(read('log/dialaA.xyz', index=':'), gui=True)
+import nglview as nv
+from ase.io import read
+nv.show_asetraj(read('log/' + structure.split('.')[0] + '.xyz', index=':'), gui=True)
 # # %%
 # import pandas as pd
 # df = pd.read_csv('log/dialaA.csv', skiprows=1)

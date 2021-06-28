@@ -307,7 +307,7 @@ class System_ANI:
 
        vec1 = x1[:, 1:, :] - x1[:, :3, :]
        vec2 = x2[:, 1:, :] - x2[:, :3, :]        
-       return torch.stack((self.get_dihedral_ani(vec1[:, 0, :], vec1[:, 1, :], vec1[:, 2,:]), self.get_dihedral_ani(vec2[:, 0, :], vec2[:, 1, :], vec2[:, 2,:])), axis=0)
+       return torch.stack((self.get_dihedral_ani(vec1[:, 0, :], vec1[:, 1, :], vec1[:, 2,:]), self.get_dihedral_ani(vec2[:, 0, :], vec2[:, 1, :], vec2[:, 2,:])), axis=1)
     #    return torch.tensor([self.get_dihedral_ani(vec1[:, 0, :], vec1[:, 1, :], vec1[:, 2,:]), self.get_dihedral_ani(vec2[:, 0, :], vec2[:, 1, :], vec2[:, 2,:])], requires_grad=True)
 
 
