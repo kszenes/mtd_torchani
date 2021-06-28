@@ -241,7 +241,7 @@ class Langevin_integrator:
             if metadyn is not None and i % 20 == 19:
                 bias = self.get_bias(self.get_cv())
                 if dTemp is not None:
-                    self.height = torch.cat((self.height, torch.tensor([self.initial_height * torch.exp(- bias / (ase.units.kB * dTemp))])))
+                    self.height = torch.cat((self.height, torch.tensor([self.initial_height * torch.exp(- bias / (ase.units.kB * dTemp))], device=device)))
                 self.peaks = torch.cat((self.peaks, self.get_cv().detach()))
                 # if self.n_cv > 1:
                 #     self.peaks = torch.cat((self.peaks, (self.get_cv().detach()))) # high-dim potential
@@ -294,7 +294,7 @@ class Langevin_integrator:
         phi_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
         psi_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
         # x_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
-        # discretisation = torch.stack((psi_range, phi_range), 0)
+        discretisation = torch.stack((psi_range, phi_range), 0)
         
         gauss = - self.height * torch.sum(torch.exp(-(x_range - self.peaks[:,None])**2 / (2*self.width**2)), dim=0)
         plt.plot(x_range, gauss)

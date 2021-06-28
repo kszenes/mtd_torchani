@@ -91,7 +91,8 @@ from ase.units import eV, Hartree, kB
 langevin_temperature = 300  # K
 langevin_gamma = 0.2
 timestep = 1  # fs
-height=0.004336
+# height=0.004336  # metady
+height=0.052 # well-tempered
 width=0.05
 
 
@@ -109,7 +110,7 @@ integrator_ani = Langevin_integrator(system_ani, timestep, device, fr=langevin_g
 # stats.sort_stats(pstats.SortKey.TIME)
 # stats.dump_stats(filename='profiling.prog')
 # %%
-n_iter = int(1e5)
+n_iter = int(1e2)
 print_iter = 1
 append = False
 
@@ -119,8 +120,30 @@ append = False
 # integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn=True, dTemp=None)
 
 # ----------- Well-tempered metad
-integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn='well-tempered', dTemp=8*langevin_temperature, append=append)
+integrator_ani.run(n_iter, device=device, metadyn='well-tempered', dTemp=8*langevin_temperature, append=append)
 
+# %%
+print(integrator_ani.peaks[:, 0, None].shape)
+print(x_range.shape)
+print(integrator_ani.height)
+# plt.plot(integrator_ani.height, marker='.')
+# plt.plot(integrator_ani.peaks[:, 0], integrator_ani.peaks[:, 1], marker='.')
+(integrator_ani.height * torch.exp(-(x_range[None, :] - integrator_ani.peaks[:, 0, None]))).shape
+
+# %%
+# torch.save(integrator_ani.peaks, 'peaks')
+peaks = torch.load('peaks').numpy()
+peaks
+psi = peaks[:, 0]
+phi = peaks[:, 1]
+
+# %%
+n_points = 1000
+x_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
+
+gauss = - height * np.sum(np.exp(-(x_range - psi[:, None])**2 / (2*width**2)))
+plt.plot(x_range, gauss)
+plt.show()
 
 # %%
 free_e = integrator_ani.get_free_energy()
@@ -136,11 +159,22 @@ free_e = integrator_ani.get_free_energy()
 import pandas as pd, matplotlib.pyplot as plt
 df = pd.read_csv('log/' + structure.split('.')[0] + '.csv', skiprows=1)
 # %%
-plt.scatter(df['Phi'], df['Psi'], marker='.', s=1)
+# plt.scatter(df['Phi'], df['Psi'], marker='.', s=1)
+# plt.xlim(-np.pi, np.pi)
+# plt.ylim(-np.pi, np.pi)
 plt.xlabel('$Phi$ / rad')
 plt.ylabel('$Psi$ / rad')
-plt.xlim(-np.pi, np.pi)
-plt.ylim(-np.pi, np.pi)
+plt.scatter(df['Phi']/np.pi * 180, df['Psi']/np.pi * 180, marker='.', s=1)
+plt.xlim(-180, 180)
+plt.ylim(-180, 180)
+
+# %%
+plt.title('Psi')
+plt.hist(df['Psi'],1000)
+plt.show()
+plt.title('Phi')
+plt.hist(df['Phi'],1000)
+plt.show()
 
 
 # %%
