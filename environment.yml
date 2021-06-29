@@ -27,11 +27,12 @@ dependencies:
   - mkl_random=1.0.2=py39h16bde0e_0
   - ncurses=6.2=h0a44026_1
   - ninja=1.10.2=hf7b0b51_1
+  - numpy-base=1.19.2=py39hde55871_0
   - openssl=1.1.1k=h9ed2024_0
   - parso=0.7.0=py_0
   - pexpect=4.8.0=pyhd3eb1b0_3
   - pickleshare=0.7.5=pyhd3eb1b0_1003
-  - pip=21.1.1=py39hecd8cb5_0
+  - pip=21.1.2=py39hecd8cb5_0
   - prompt-toolkit=3.0.17=pyh06a4308_0
   - ptyprocess=0.7.0=pyhd3eb1b0_2
   - pycparser=2.20=py_2
@@ -82,6 +83,7 @@ dependencies:
     - llvmlite==0.36.0
     - markupsafe==2.0.1
     - matplotlib==3.4.2
+    - memory-profiler==0.58.0
     - mistune==0.8.4
     - moleculekit==0.7.6
     - monty==2021.5.9
@@ -104,6 +106,7 @@ dependencies:
     - pillow==8.2.0
     - plotly==4.14.3
     - prometheus-client==0.11.0
+    - psutil==5.8.0
     - pymatgen==2022.0.8
     - pyparsing==2.4.7
     - pypng==0.0.20
@@ -121,6 +124,7 @@ dependencies:
     - six==1.16.0
     - sklearn==0.0
     - smmap==4.0.0
+    - snakeviz==2.1.0
     - spglib==1.16.1
     - sympy==1.8
     - tabulate==0.8.9
@@ -133,7 +137,7 @@ dependencies:
     - torchvision==0.9.1
     - tqdm==4.61.0
     - typing-extensions==3.10.0.0
-    - uncertainties==3.1.5
+    - uncertainties==2.4.4
     - urllib3==1.26.5
     - webencodings==0.5.1
     - widgetsnbextension==3.5.1
