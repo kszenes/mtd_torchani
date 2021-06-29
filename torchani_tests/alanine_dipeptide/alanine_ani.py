@@ -78,14 +78,14 @@ print(system_ani.get_dihedrals_ani().shape)
 # f_bias
 
 # %%
-from minimizers import minimize_pytorch_bfgs_ANI
+from minimizers import minimize_pytorch_lbfgs_ANI
 print(system_ani.pos)
-minimize_pytorch_bfgs_ANI(system_ani, steps=1000)
+minimize_pytorch_lbfgs_ANI(system_ani, steps=1000)
 print(system_ani.pos)
 
 #%%
 # ---------- Torchani ---------
-from integrator import Integrator_ANI, Langevin_integrator
+from integrator import Langevin_integrator
 from ase.units import eV, Hartree, kB
 
 langevin_temperature = 300  # K
@@ -120,7 +120,7 @@ append = False
 # integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter, device=device, metadyn=True, dTemp=None)
 
 # ----------- Well-tempered metad
-integrator_ani.run(n_iter, device=device, metadyn='well-tempered', dTemp=8*langevin_temperature, append=append)
+integrator_ani.run(n_iter, traj_file='log/' + structure.split('.')[0] + '.xyz', log_file='log/' + structure.split('.')[0] + '.csv', log_interval=print_iter,device=device, metadyn='well-tempered', metadyn_func=system_ani.get_dihedrals_ani, dTemp=8*langevin_temperature, append=append)
 
 # %%
 print(integrator_ani.peaks[:, 0, None].shape)
@@ -158,6 +158,7 @@ free_e = integrator_ani.get_free_energy()
 # %%
 import pandas as pd, matplotlib.pyplot as plt
 df = pd.read_csv('log/' + structure.split('.')[0] + '.csv', skiprows=1)
+df
 # %%
 # plt.scatter(df['Phi'], df['Psi'], marker='.', s=1)
 # plt.xlim(-np.pi, np.pi)

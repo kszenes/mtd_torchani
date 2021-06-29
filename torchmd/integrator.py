@@ -7,14 +7,10 @@ import time
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-TIMEFACTOR = 48.88821
-BOLTZMAN = 0.001987191
+# TIMEFACTOR = 48.88821
+# BOLTZMAN = 0.001987191
+# PICOSEC2TIMEU = 1000.0 / TIMEFACTOR
 
-
-
-def kinetic_energy(masses, vel):
-    Ekin = torch.sum(0.5 * torch.sum(vel * vel, dim=2, keepdim=True) * masses, dim=1)
-    return Ekin
 
 
 def maxwell_boltzmann(masses, T, replicas=1, device='cuda'):
@@ -29,118 +25,42 @@ def maxwell_boltzmann(masses, T, replicas=1, device='cuda'):
     return torch.stack(velocities, dim=0)
 
 
-def kinetic_to_temp(Ekin, natoms):
-    return 2.0 / (3.0 * natoms * BOLTZMAN) * Ekin
-
-
-def _first_VV(pos, vel, force, mass, dt):
-    accel = force / mass
-    pos += vel * dt + 0.5 * accel * dt * dt
-    vel += 0.5 * dt * accel
-
-def _second_VV(vel, force, mass, dt):
-    accel = force / mass
-    vel += 0.5 * dt * accel
-
-
-def langevin(vel, gamma, coeff, dt, device):
-    csi = torch.randn_like(vel, device=device) * coeff
-    vel += -gamma * vel * dt + csi
-
-def _first_VV_ani(system, dt):
-    accel = system.forces / system.masses
-    # pos += vel * dt + 0.5 * accel * dt * dt
-
-    # pos = system.pos.detach()
-    # pos += system.vel * dt + 0.5 * accel * dt * dt
-    # system.pos = torch.tensor(pos, requires_grad=True)
-    with torch.no_grad():
-        system.pos += system.vel * dt + 0.5 * accel * dt * dt
-
-    # system.pos = (system.pos + system.vel * dt + 0.5 * accel * dt * dt).float()
-    system.vel += 0.5 * dt * accel
-
-def _second_VV_ani(system, dt):
-    system.compute_forces()
-    accel = system.forces / system.masses
-    system.vel += 0.5 * dt * accel
-
-
-def langevin_ani(system, gamma, coeff, dt, device):
-    csi = torch.randn_like(system.vel, device=device) * coeff
-    system.vel += -gamma * system.vel * dt + csi
-
-
-
-PICOSEC2TIMEU = 1000.0 / TIMEFACTOR
-
-
-class Integrator:
-    def __init__(self, systems, forces, timestep, device, gamma=None, T=None):
-        self.dt = timestep / TIMEFACTOR
-        self.systems = systems
-        self.forces = forces
-        self.device = device
-        gamma = gamma / PICOSEC2TIMEU
-        self.gamma = gamma
-        self.T = T
-        if T:
-            M = self.forces.par.masses
-            self.vcoeff = torch.sqrt(2.0 * gamma / M * BOLTZMAN * T * self.dt).to(
-                device
-            )
-
-    def step(self, niter=1):
-        s = self.systems
-        masses = self.forces.par.masses
-        natoms = len(masses)
-        for _ in range(niter):
-            _first_VV(s.pos, s.vel, s.forces, masses, self.dt)
-            pot = self.forces.compute(s.pos, s.box, s.forces)
-            if self.T:
-                langevin(s.vel, self.gamma, self.vcoeff, self.dt, self.device)
-            _second_VV(s.vel, s.forces, masses, self.dt)
-
-        Ekin = np.array([v.item() for v in kinetic_energy(masses, s.vel)])
-        T = kinetic_to_temp(Ekin, natoms)
-        return Ekin, pot, T
-
-class Integrator_ANI:
-    def __init__(self, systems, timestep, device, gamma=None, T=None):
-        self.dt = timestep / TIMEFACTOR
-        self.systems = systems
-        self.forces = systems.forces
-        self.device = device
-        self.masses = systems.masses
-        gamma = gamma / PICOSEC2TIMEU
-        self.gamma = gamma
-        self.T = T
-        if T:
-            M = self.masses
-            self.vcoeff = torch.sqrt(2.0 * gamma / M * BOLTZMAN * T * self.dt).to(
-                device
-            )
-
-    def step(self, niter=1):
-        s = self.systems
-        masses = self.masses
-        natoms = len(masses)
-        for _ in range(niter):
-            _first_VV_ani(s, self.dt)
-            # pot = self.forces.compute(s.pos, s.box, s.forces)
-            if self.T:
-                langevin_ani(s, self.gamma, self.vcoeff, self.dt, self.device)
-            _second_VV_ani(s, self.dt)
-
-        Ekin = np.array([v.item() for v in kinetic_energy(masses, s.vel)])
-        T = kinetic_to_temp(Ekin, natoms)
-        s.compute_forces()
-
-        return Ekin, s.energy, T
-
-
 class Langevin_integrator:
-    def __init__(self, system, dt, device, fr=None, temp=None, fix_com=True, height=0.004336, width=0.05):
+    '''Langevin integrator ported from ase. Based on paper: 10.1103/PhysRevE.75.056707
+
+        Parameters recommended to run simulation:
+
+        https://www.sciencedirect.com/topics/biochemistry-genetics-and-molecular-biology/metadynamics
+        height = 0.1 kcal/mol = 0.004336 eV
+        width = 0.05
+        deposition rate = 2ps
+        sampling time = 500ns
+
+        Plumed masterclass 21-4.2
+        initial height = 1.2 kcal/mol = 0.052 eV
+        bias factor = (temp + dTemp) / temp = 8
+    '''
+
+    def __init__(self, system, dt, device='cuda', fr=None, temp=None, fix_com=True, height=0.004336, width=0.05):
+        '''
+        Parameters
+        ----------
+        system : System_ANI
+        dt : int
+            Timestep (fs)
+        device : torch.device
+        fr : float
+            Friction coefficient
+        temp : int
+            Temperature
+        fix_com : bool
+            Recenter system after each step
+        height : float
+            Height of gaussian for metadynamics
+        width : float
+            Width of gaussian for metadynamics
+        '''
+
         self.fr = fr 
         self.temp = temp * ase.units.kB
         self.dt = dt * ase.units.fs
@@ -149,12 +69,13 @@ class Langevin_integrator:
         self.fix_com = fix_com
         self.initial_height = height
         self.height = torch.tensor([height], device=device)
-
         self.width = width
+        self.device = device
 
         self.updatevars()
 
     def updatevars(self):
+        '''Update coefficients used in Langevin integrator'''
         dt = self.dt
         T = self.temp 
         fr = self.fr
@@ -168,6 +89,16 @@ class Langevin_integrator:
         self.c4 = fr / 2. * self.c5
 
     def step(self, forces=None, metadyn=None, device='cuda'):
+        '''Do a step of integration
+        
+        Parameters
+        ----------
+        forces : not implemented
+            Add external force
+        metadym : None (MD), True (Metadynamics), well-tempered (Well-tempered metadynamics)
+            Type of simulation to run
+        '''
+
         system = self.system
         n_system = len(system)
 
@@ -195,17 +126,42 @@ class Langevin_integrator:
         self.vel += (self.c1 * forces / self.masses - self.c2 * self.vel +
                 self.c3 * self.xi - self.c4 * self.eta)
         system.set_velocities(self.vel)
-
         # return system.get_kinetic_energy(), system.get_potential_energy(), system.get_temperature()
 
     def run(self, n_iter=1, traj_file=None, traj_interval=1, log_file=None, log_interval=1, per_atom=True, metadyn=None, metadyn_func=None, dTemp=None, append=False, device='cuda'):
-        # start_time = time.time()
+        '''Run simulation
+
+        Paremeters
+        ----------
+        n_iter : int
+            Number of steps to do
+        traj_file : None or string
+            Name of file to output trajectory (xyz format)
+        traj_interval : int
+            Output trajectory every traj_interval timesteps
+        log_file : None or string
+            Name of file to output energies, temperature, dihedrals ...  (csv format)
+        log_interval : int
+            Output csv every log_interval timesteps
+        per_atom : bool
+            Output log information per atom
+        metadyn : None (MD), True (Metadynamics), well-tempered (Well-tempered metadynamics)
+            Type of simulation to run
+        metadyn_func : function
+            Function that returns CV of system in a configuration
+        dTemp : float
+            Delta Temp used in well-tempered metadynamics
+        append : bool
+            If run interactively (e.g. Jupyter), continue running simulation from where it ended (does not appends to traj/log file as well as peaks)
+        '''
+
         if traj_file is not None:
             if append == False:
                 traj_f = open(traj_file, 'w')
             else:
                 traj_f = open(traj_file, 'a')
 
+        # log_file == '-' indicates to print to stdout
         if log_file is not None and log_file != '-':
             if append == False:
                 log_f = open(log_file, 'w')
@@ -218,15 +174,20 @@ class Langevin_integrator:
             # log_f.write('Epot,' + 'Ekin,' + 'Etot,' + 'Temp\n')
 
 
+        # Initialize metadynamics parameters
         if metadyn is not None and append == False:
-            self.peaks = self.get_cv().detach()
-            self.n_cv = torch.numel(self.peaks)
+            self.metadyn_func = metadyn_func
+            self.peaks = self.get_cv().detach()  # peaks of gaussian
+            self.n_cv = torch.numel(self.peaks)  # number of collective variables CV
             if metadyn == 'well-tempered':
                 if dTemp is None:
                     raise Exception('dTemp must be provided for well-tempered metadynamics')
+                else:
+                    self.dTemp = dTemp
 
 
 
+        # Tqdm provides visual progess bar
         for i in tqdm(range(n_iter)):
             if traj_file is not None and i % traj_interval == 0:
                 self.write_traj(traj_f)
@@ -238,15 +199,16 @@ class Langevin_integrator:
                     self.write_log(log_f, per_atom)
 
             self.step(metadyn=metadyn, device=device)
+
+            # Add gaussian every 20 fs
             if metadyn is not None and i % 20 == 19:
                 bias = self.get_bias(self.get_cv())
-                if dTemp is not None:
-                    self.height = torch.cat((self.height, torch.tensor([self.initial_height * torch.exp(- bias / (ase.units.kB * dTemp))], device=device)))
+                if metadyn == 'well-tempered':
+                    # add height of gaussian for well-tempered metad
+                    self.height = torch.cat((self.height, self.get_gauss_height()))
+
+                # add location of peak of gaussianght()))
                 self.peaks = torch.cat((self.peaks, self.get_cv().detach()))
-                # if self.n_cv > 1:
-                #     self.peaks = torch.cat((self.peaks, (self.get_cv().detach()))) # high-dim potential
-                # else:
-                    # self.peaks = torch.cat((self.peaks, (self.get_cv().detach()))) # 1d potential
 
 
         if traj_file is not None:
@@ -255,42 +217,32 @@ class Langevin_integrator:
         if log_file is not None and log_file != '-':
             log_f.close()
 
-        # run_time = time.time() - start_time
-        # print(f"----------- Simulation took {(run_time):.2f} sec ({(n_iter/run_time):.2f} iters/sec) -----------")
-
     def get_cv(self):
-        # return self.system.get_phi()
-        return self.system.get_dihedrals_ani()
+        '''Returns collective variable for metadynamics'''
+        return self.metadyn_func()
 
     def get_bias(self, cv):
-        ''' 
-        https://www.sciencedirect.com/topics/biochemistry-genetics-and-molecular-biology/metadynamics
-        height = 0.1 kcal/mol = 0.004336 eV
-        width = 0.05
-        deposition rate = 2ps
-        sampling time = 500ns
-
-        Plumed masterclass 21-4.2
-        initial height = 1.2 kcal/mol = 0.052 eV
-        bias factor = 8
-        '''
+        '''Returns bias potential at a certain CV'''
+        # Seperate 1 dim CV and higher dim CV
         if self.n_cv > 1:
-            # print(torch.sum(self.height * torch.exp(-(cv[:, 0] - self.peaks[:, 0])**2 / (2*self.width**2)) * torch.exp(-(cv[:, 1] - self.peaks[:, 1])**2 / (2*self.width**2))))
             return torch.sum(self.height * torch.prod(torch.exp(- (cv - self.peaks)**2 / (2 * self.width**2)), dim=1))
         else:
             return torch.sum(self.height * torch.exp(- (cv - self.peaks)**2 / (2 * self.width**2)))
 
 
     def get_bias_forces(self):
+        '''Returns forces from bias'''
         bias = self.get_bias(self.get_cv())
         f_bias = -torch.autograd.grad(bias, self.system.pos)[0]
         return f_bias
 
-    def get_gauss_height(self, cv, well_tempered=False):
-        if not well_tempered:
-            return self.height
+    def get_gauss_height(self):
+        '''Returns height of gaussian for well-tempered metadynamics'''
+        bias = self.get_bias(self.get_cv())
+        return torch.tensor([self.initial_height * torch.exp(- bias / (ase.units.kB * self.dTemp))], device=self.device)
 
     def get_free_energy(self, n_points=1000):
+        '''Not implemented yet'''
         phi_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
         psi_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
         # x_range = torch.arange(-np.pi, np.pi, 2*np.pi/n_points)
