@@ -1,6 +1,6 @@
 # %%
 import sys
-sys.path.append("/Users/kalmanszenes/code/mtd_torchani/torchmd")
+sys.path.append("../../src")
 # sys.path.append("/data/kszenes/mtd_torchani/torchmd")
 
 import torch
