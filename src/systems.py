@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import torchani
 import ase.units
+from ase.io import read
 import nglview as nv
 
 # BOLTZMAN = 0.001987191
@@ -22,6 +23,7 @@ class System_ANI:
         self.species = species.to(device)
         self.masses = masses.type(precision).to(device)
         self.symbols = symbols
+        self.device = device
 
         #self.precision_(precision)
         #self.to_(device)
@@ -69,6 +71,12 @@ class System_ANI:
         """Returns an ase Atoms object corresponding to the Sytem_ANI"""
         x = ase.Atoms(self.get_species().cpu().reshape(-1), self.get_positions().detach().cpu().reshape(-1, 3))
         return x
+
+    @classmethod
+    def read_file(cls, filename, device='cuda'):
+        x = read(filename)
+        return cls.from_ase(x, device)
+
 
     def get_species(self):
         return self.species
